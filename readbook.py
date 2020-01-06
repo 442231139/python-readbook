@@ -218,3 +218,4 @@ class SqliteCon(object):
 SqliteCon().check()
 SqlCude()
 # test
+# haha
