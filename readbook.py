@@ -216,3 +216,4 @@ class SqliteCon(object):
 # go_on(file_path)
 # history(file_path)
 SqliteCon().check()
+SqlCude()
