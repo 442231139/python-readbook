@@ -72,7 +72,7 @@ class SqliteCon(object):
         for a, b, f in book_dirs:
             for i in f:
                 book_name = os.path.join(a, i)
-                book_list.append(book_name)
+                book_list.append(book_name.decode('gbk'))
         return book_list
 
     def action_read(self, book_name, index, plus=True):
@@ -236,3 +236,4 @@ class SqliteCon(object):
 
 
 SqliteCon().check()
+
