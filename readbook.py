@@ -29,7 +29,7 @@ class SqliteCon(object):
         try:
             conf = json.loads(re.sub('#.*\n', '', f.read().replace("'", '"')))
         except Exception as e:
-            raise '配置文件出错：', e
+            raise Exception('配置文件出错： %s' % e)
     when_read = ''
     line_number = conf.get('page_line_number')  # 5
     up = conf.get('up')  # m
@@ -117,7 +117,7 @@ class SqliteCon(object):
             if not for_res:
                 self.show_chapters(book_name)
             for i in for_res:
-                print i[1], ' : ', i[2]
+                print i[1], ' : ', str(i[2])
                 indexes[str(i[1])] = int(i[-1])
             is_go_on = raw_input('')
             if is_go_on.isdigit():
@@ -166,7 +166,7 @@ class SqliteCon(object):
             if not for_mark:
                 self.book_mark()
             for i in for_mark:
-                print i[0], ' : ', i[1]
+                print i[0], ' : ', str(i[1])
                 indexes[str(i[0])] = int(i[-1])
             is_go_on = raw_input('')
             if is_go_on.isdigit():
