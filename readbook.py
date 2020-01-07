@@ -2,15 +2,18 @@
 import linecache
 import re
 import json
-import os, time, sys
+import os
+import time
+import sys
 from sql_create import SqlCude
 
 reload(sys)
 sys.setdefaultencoding('utf8')
+os.system('chcp 65001')
 
 
 def read_search_name(chapter_name, file_path):
-    # 输入章节跳转执行章节行
+    # 输入章节跳转执行章节行 不启用
     with open(file_path, 'r') as f:
         index = 0
         res = f.readline()
@@ -24,21 +27,21 @@ def read_search_name(chapter_name, file_path):
 class SqliteCon(object):
     with open('config.conf', 'r') as f:
         try:
-            conf = json.loads(f.read().replace("'", '"'))
+            conf = json.loads(re.sub('#.*\n', '', f.read().replace("'", '"')))
         except Exception as e:
             raise '配置文件出错：', e
     when_read = ''
-    line_number = conf.get('page_line_number')
-    up = conf.get('up')
-    down = conf.get('down')
-    checks = conf.get('checks')
-    book = conf.get('show_book')
-    mark = conf.get('show_mark')
-    quite = conf.get('quite')
-    cha = conf.get('cha')
-    add = conf.get('add')
-    chapters = conf.get('show_cha')
-    color = conf.get('color')
+    line_number = conf.get('page_line_number')  # 5
+    up = conf.get('up')  # m
+    down = conf.get('down')  # ''
+    checks = conf.get('checks')  # c
+    book = conf.get('show_book')  # b
+    mark = conf.get('show_mark')  # a
+    quite = conf.get('quite')  # n
+    cha = conf.get('cha')  # 章
+    add = conf.get('add')  # t
+    chapters = conf.get('show_cha')  # z
+    color = conf.get('color')  # red
 
     def __init__(self):
         if not os.path.isfile('./cache.db'):
@@ -50,6 +53,8 @@ class SqliteCon(object):
             u'百': 100, u'千': 1000, u'万': 10000
         }
         zh = zh.replace(u'零', '')
+        if zh[:1] == u'十':
+            zh = u'一' + zh
         d = 0
         for i in range(0, len(zh), 2):
             split_zh = zh[i:i + 2]
@@ -78,13 +83,14 @@ class SqliteCon(object):
         if index < 0:
             index = 0
         init = 0
+        os.system('cls')
         while self.line_number > init:
             res = linecache.getline(book_name, index)
             index += 1
-            init += 1
             if res not in ['\n', '\r', '\n\r']:
-                os.system('cls')
-                print res.replace('\n', '').replace('  ', '')
+                print_content = '\033[1;{}m {} \033[0m'.format(self.color, res.replace('\n', '').replace('  ', ''))
+                print print_content
+                init += 1
         SqlCude().ex_sql('''update read_book_list set indexes='%s' where name='%s' ''' % (index, book_name))
         SqlCude().ex_sql('''update last_read set name='%s' ''' % book_name)
         is_go_on = raw_input('')
@@ -94,6 +100,8 @@ class SqliteCon(object):
             self.action_read(book_name, index, plus=False)
         elif is_go_on.lower() == self.add:
             name = raw_input('请输入标签名')
+            if not name:
+                name = linecache.getline(book_name, index)
             SqlCude().ex_sql(
                 "insert into bookmark (name, book, indexes) values ('{}','{}','{}')".format(name, book_name, index))
             print 'add ok'
@@ -104,46 +112,61 @@ class SqliteCon(object):
     def show_chapters(self, book_name, index=0):
         res = SqlCude().search('chapter', book=book_name)
         indexes = {}
-        if res:
-            for i in res[index:index + 10]:
+        while res:
+            for_res = res[index:index + 10]
+            if not for_res:
+                self.show_chapters(book_name)
+            for i in for_res:
                 print i[1], ' : ', i[2]
                 indexes[str(i[1])] = int(i[-1])
             is_go_on = raw_input('')
             if is_go_on.isdigit():
-                self.action_read(book_name, indexes.get(str(is_go_on)))
+                self.action_read(book_name, indexes.get(is_go_on))
             elif is_go_on == self.up:
                 index = index - 10 if index >= 10 else 0
                 self.show_chapters(book_name, index=index)
             elif is_go_on == self.down:
                 index += 10
-            self.show_chapters(book_name, index=index)
+            else:
+                self.check()
         else:
+            print 'init ing...'
             self.init_chapter(book_name)
             time.sleep(0.1)
+            print 'init ok'
             self.show_chapters(book_name)
 
     def init_chapter(self, book_name):
         with open(book_name, 'r') as t:
             res = t.readline()
             book_index = 0
+            sql_str = ""
             while res:
                 if re.match('第', res):
                     ccc = re.sub(u'[一二三四五六七八九十百千万]', '', unicode(res, 'utf-8'))
                     if ccc[0:2] == u'第{}'.format(self.cha):
                         zh_num = res.split('章')[0].replace('第', '').replace(' ', '')
                         numbner = self.y_c(zh_num)
-                        sql = "insert into chapter (order_id, name, book, indexes) values ('{}','{}','{}','{}')".format(
-                            numbner, res, book_name, book_index)
-                        SqlCude().ex_sql(sql)
+                        sql_str += "('{}','{}','{}','{}'),".format(numbner, res, book_name, book_index)
+                        # sql = "insert into chapter (order_id, name, book, indexes) values ('{}','{}','{}','{}')".format(
+                        #     numbner, res, book_name, book_index)
+                        # SqlCude().ex_sql(sql)
                 book_index += 1
                 res = t.readline()
+        if sql_str:
+            sql_str = sql_str[:-1]
+            insert_sql = ''' insert into  chapter (order_id, name, book, indexes) values {}'''.format(sql_str)
+            SqlCude().ex_sql(insert_sql)
 
     def book_mark(self, index=0):
         mark_list = SqlCude().search('bookmark', book=self.when_read)
         indexes = {}
         if mark_list:
-            for i in mark_list[index:index + 10]:
-                print i[1], ' : ', i[2]
+            for_mark = mark_list[index:index + 10]
+            if not for_mark:
+                self.book_mark()
+            for i in for_mark:
+                print i[0], ' : ', i[1]
                 indexes[str(i[0])] = int(i[-1])
             is_go_on = raw_input('')
             if is_go_on.isdigit():
@@ -153,10 +176,11 @@ class SqliteCon(object):
                 self.show_chapters(self.when_read, index=index)
             elif is_go_on == self.down:
                 index += 10
-                self.show_chapters(self.when_read, index=index)
+                self.book_mark(index)
             else:
                 self.check()
         else:
+            print '没有书签'
             self.check()
 
     def book_read(self, name):
@@ -172,21 +196,22 @@ class SqliteCon(object):
 
     def run(self):
         is_last_name = SqlCude().search('last_read', True)[0][0]
-        if is_last_name and is_last_name != '0':
+        if is_last_name and is_last_name != 'a':
             self.book_read(is_last_name)
         else:
             self.display_book()
 
     def display_book(self):
         book_list = self.book_list()
+        check_num = map(str, range(len(book_list)))
         for index, i in enumerate(book_list):
             print index, ' : ', i.split('\\')[-1]
         check_book = raw_input('请输入编号')
-        if check_book.lower() == self.chapters:
-            self.check()
-        self.book_read(book_list[int(check_book)])
+        if check_book.isdigit and check_book in check_num:
+            self.book_read(book_list[int(check_book)])
+        self.check()
 
-    def check(self, book_name=None):
+    def check(self):
         if not self.when_read:
             self.when_read = SqlCude().search('last_read', all=True)[0][0]
         check = raw_input('主界面，请选择')
@@ -196,27 +221,18 @@ class SqliteCon(object):
         # 章节
         elif check.lower() == self.chapters:
             self.show_chapters(self.when_read)
+        # 标签
         elif check.lower() == self.mark:
             self.book_mark()
-
         # 继续上次
         elif check.lower() == '':
             self.run()
         # 退出
         elif check.lower() == self.quite:
             print 'bye !!!'
-            return
+            os._exit(0)
+        else:
+            self.check()
 
-    def test(self):
-        pass
 
-
-# read_search_name('第九百六十章')
-# read_one_chapter(89)
-# go_on(file_path)
-# history(file_path)
 SqliteCon().check()
-SqlCude()
-# test
-# haha
-# test222

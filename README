@@ -1,0 +1,5 @@
+1. 配置文件里设置快捷键
+2. 所有书本放到books里方可读取
+3. 只测试了标准版的txt小说
+4. 版本python2
+5. 启动方式 python readbook.py 
