@@ -5,6 +5,7 @@ import json
 import os
 import time
 import sys
+import datetime
 from sql_create import SqlCude
 
 reload(sys)
@@ -89,7 +90,7 @@ class SqliteCon(object):
             index += 1
             if res not in ['\n', '\r', '\n\r']:
                 print_content = '\033[1;{}m {} \033[0m'.format(self.color, res.replace('\n', '').replace('  ', ''))
-                print print_content
+                print '---LOG.DUBUG---',datetime.datetime.now(), print_content
                 init += 1
         SqlCude().ex_sql('''update read_book_list set indexes='%s' where name='%s' ''' % (index, book_name))
         SqlCude().ex_sql('''update last_read set name='%s' ''' % book_name)
@@ -109,7 +110,8 @@ class SqliteCon(object):
         else:
             self.check()
 
-    def show_chapters(self, book_name, index=0):
+    def show_chapters(self, index=0):
+        book_name = self.when_read
         res = SqlCude().search('chapter', book=book_name)
         indexes = {}
         while res:
@@ -146,11 +148,8 @@ class SqliteCon(object):
                     ccc = re.sub(u'[一二三四五六七八九十百千万]', '', unicode(res, 'utf-8'))
                     if ccc[0:2] == u'第{}'.format(self.cha):
                         zh_num = res.split('章')[0].replace('第', '').replace(' ', '')
-                        numbner = self.y_c(zh_num)
-                        sql_str += "('{}','{}','{}','{}'),".format(numbner, res, book_name, book_index)
-                        # sql = "insert into chapter (order_id, name, book, indexes) values ('{}','{}','{}','{}')".format(
-                        #     numbner, res, book_name, book_index)
-                        # SqlCude().ex_sql(sql)
+                        number = self.y_c(zh_num)
+                        sql_str += "('{}','{}','{}','{}'),".format(number, res, book_name, book_index)
                 book_index += 1
                 res = t.readline()
         if sql_str:
@@ -187,7 +186,6 @@ class SqliteCon(object):
         res = SqlCude().search('read_book_list', name=name)
         if not res:
             SqlCude().ex_sql("insert into read_book_list (name, indexes) values ('%s', '1')" % name)
-
             time.sleep(0.1)
             self.book_read(name)
         else:
@@ -211,29 +209,19 @@ class SqliteCon(object):
             self.book_read(book_list[int(check_book)])
         self.check()
 
+    def quite_down(self):
+        print 'bye !!!'
+        os._exit(0)
+
     def check(self):
         if not self.when_read:
             self.when_read = SqlCude().search('last_read', all=True)[0][0]
+        function_dict = {self.book: self.display_book, self.chapters: self.show_chapters,
+                         self.mark: self.book_mark, self.down: self.run, self.quite: self.quite_down}
         check = raw_input('主界面，请选择')
-        # 书列表
-        if check.lower() == self.book:
-            self.display_book()
-        # 章节
-        elif check.lower() == self.chapters:
-            self.show_chapters(self.when_read)
-        # 标签
-        elif check.lower() == self.mark:
-            self.book_mark()
-        # 继续上次
-        elif check.lower() == '':
-            self.run()
-        # 退出
-        elif check.lower() == self.quite:
-            print 'bye !!!'
-            os._exit(0)
+        if function_dict[check]():
+            pass
         else:
             self.check()
 
-
 SqliteCon().check()
-
