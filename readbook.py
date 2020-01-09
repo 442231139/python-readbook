@@ -32,17 +32,9 @@ class SqliteCon(object):
         except Exception as e:
             raise Exception('配置文件出错： %s' % e)
     when_read = ''
-    line_number = conf.get('page_line_number')  # 5
-    up = conf.get('up')  # m
-    down = conf.get('down')  # ''
-    checks = conf.get('checks')  # c
-    book = conf.get('show_book')  # b
-    mark = conf.get('show_mark')  # a
-    quite = conf.get('quite')  # n
-    cha = conf.get('cha')  # 章
-    add = conf.get('add')  # t
-    chapters = conf.get('show_cha')  # z
-    color = conf.get('color')  # red
+    conf_list = ['line_number', 'up', 'down', 'checks', 'book', 'mark', 'quite', 'cha', 'add', 'chapters', 'color']
+    for i in conf_list:
+        locals()[i] = conf.get(i)
 
     def __init__(self):
         if not os.path.isfile('./cache.db'):
@@ -80,7 +72,9 @@ class SqliteCon(object):
         index = int(index)
         self.when_read = book_name
         if not plus:
-            index -= self.line_number
+            index -= int(self.line_number)*2
+        if isinstance(book_name, str):
+            book_name = unicode(book_name)
         if index < 0:
             index = 0
         init = 0
@@ -90,7 +84,7 @@ class SqliteCon(object):
             index += 1
             if res not in ['\n', '\r', '\n\r']:
                 print_content = '\033[1;{}m {} \033[0m'.format(self.color, res.replace('\n', '').replace('  ', ''))
-                print '---LOG.DUBUG---',datetime.datetime.now(), print_content
+                print index,print_content
                 init += 1
         SqlCude().ex_sql('''update read_book_list set indexes='%s' where name='%s' ''' % (index, book_name))
         SqlCude().ex_sql('''update last_read set name='%s' ''' % book_name)
@@ -133,15 +127,24 @@ class SqliteCon(object):
                 self.check()
         else:
             print 'init ing...'
-            self.init_chapter(book_name)
+            if book_name == 'a':
+                book_list = self.book_list()
+                for i in book_list:
+                    self.init_chapter(i)
+                    book_name = i
+            else:
+                self.init_chapter(book_name)
             time.sleep(0.1)
             print 'init ok'
-            self.show_chapters(book_name)
+            self.when_read = book_name
+            self.show_chapters()
 
     def init_chapter(self, book_name):
+        if isinstance(book_name, str):
+            book_name = unicode(book_name)
         with open(book_name, 'r') as t:
             res = t.readline()
-            book_index = 0
+            book_index = 1
             sql_str = ""
             while res:
                 if re.match('第', res):
@@ -150,8 +153,11 @@ class SqliteCon(object):
                         zh_num = res.split('章')[0].replace('第', '').replace(' ', '')
                         number = self.y_c(zh_num)
                         sql_str += "('{}','{}','{}','{}'),".format(number, res, book_name, book_index)
-                book_index += 1
                 res = t.readline()
+                if '\r\n' in res:
+                    book_index += 1
+                book_index += 1
+
         if sql_str:
             sql_str = sql_str[:-1]
             insert_sql = ''' insert into  chapter (order_id, name, book, indexes) values {}'''.format(sql_str)
@@ -219,9 +225,21 @@ class SqliteCon(object):
         function_dict = {self.book: self.display_book, self.chapters: self.show_chapters,
                          self.mark: self.book_mark, self.down: self.run, self.quite: self.quite_down}
         check = raw_input('主界面，请选择')
-        if function_dict[check]():
-            pass
+        if check in function_dict:
+            function_dict[check]()
         else:
             self.check()
 
-SqliteCon().check()
+
+def action():
+    try:
+        SqliteCon().check()
+    except Exception as e:
+        print 'ERROR:>>>', e
+    finally:
+        action()
+
+
+if __name__ == '__main__':
+    action()
+    # SqliteCon().check()
