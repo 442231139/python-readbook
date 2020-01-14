@@ -70,22 +70,30 @@ class SqliteCon(object):
 
     def action_read(self, book_name, index, plus=True):
         index = int(index)
+
         self.when_read = book_name
-        if not plus:
-            index -= int(self.line_number)*2
         if isinstance(book_name, str):
             book_name = unicode(book_name)
         if index < 0:
             index = 0
         init = 0
         os.system('cls')
+        print_all = ''
         while self.line_number > init:
             res = linecache.getline(book_name, index)
-            index += 1
+            if plus:
+                index += 1
+            else:
+                index -= 1
             if res not in ['\n', '\r', '\n\r']:
-                print_content = '\033[1;{}m {} \033[0m'.format(self.color, res.replace('\n', '').replace('  ', ''))
-                print index,print_content
+                print_content = res.replace('\n', '').replace('\t', '')
+                if plus:
+                    print_all += print_content + '\n'
+                else:
+                    print_all = print_content + '\n' + print_all
                 init += 1
+        chuli = '\033[1;{}m{}\033[0m'.format(self.color, print_all)
+        print chuli
         SqlCude().ex_sql('''update read_book_list set indexes='%s' where name='%s' ''' % (index, book_name))
         SqlCude().ex_sql('''update last_read set name='%s' ''' % book_name)
         is_go_on = raw_input('')
